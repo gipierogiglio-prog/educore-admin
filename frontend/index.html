@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduCore - Admin</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;background:#f1f5f9;color:#1e293b}.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;font-size:14px;font-weight:500;cursor:pointer;transition:.2s}.btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}.btn-danger{background:#dc2626;color:#fff}.btn-outline{background:transparent;border:1px solid #cbd5e1;color:#475569}.card{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:24px}.input{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px}.select{padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff}table{width:100%;border-collapse:collapse}td,th{padding:12px 8px;text-align:left;border-bottom:1px solid #f1f5f9;font-size:14px}th{color:#64748b;font-weight:500}.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:500}.badge-active{background:#dcfce7;color:#166534}.badge-inactive{background:#fee2e2;color:#991b1b}.badge-suspended{background:#fef3c7;color:#92400e}</style>
+</head><body><div id="root"></div><script type="module">
+import React,{useState,useEffect}from 'react'
+import{createRoot}from 'react-dom/client'
+
+const API=''
+let token=localStorage.getItem('token')
+
+async function apiFetch(path,opts={}){
+  const headers={'Content-Type':'application/json'}
+  if(token)headers['Authorization']='Bearer '+token
+  const res=await fetch(API+path,{...opts,headers})
+  if(res.status===401){token=null;localStorage.removeItem('token');window.location.hash='#login'}
+  const data=await res.json()
+  if(!res.ok)throw new Error(data.message||'Erro')
+  return data
+}
+
+function Login({onLogin}){
+  const[email,setEmail]=useState('admin@educore.com')
+  const[pass,setPass]=useState('admin123')
+  const[err,setErr]=useState('')
+  const handle=async e=>{
+    e.preventDefault()
+    try{
+      const res=await apiFetch('/api/auth/login',{method:'POST',body:JSON.stringify({email,password:pass})})
+      token=res.token;localStorage.setItem('token',res.token);onLogin()
+    }catch(e){setErr(e.message)}
+  }
+  return React.createElement('div',{style:{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'linear-gradient(135deg,#1e3a8a,#2563eb)'}},
+    React.createElement('div',{className:'card',style:{width:400}},
+      React.createElement('h1',{style:{fontSize:'1.5rem',marginBottom:4}},'EduCore Admin'),
+      React.createElement('p',{style:{color:'#64748b',fontSize:'0.875rem',marginBottom:24}},'Painel de gerenciamento'),
+      err&&React.createElement('div',{style:{background:'#fee2e2',color:'#991b1b',padding:'8px 12px',borderRadius:6,marginBottom:12,fontSize:'0.875rem'}},err),
+      React.createElement('form',{onSubmit:handle,style:{display:'flex',flexDirection:'column',gap:12}},
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:4}},
+          React.createElement('label',{style:{fontSize:'0.875rem',fontWeight:500}},'Email'),
+          React.createElement('input',{className:'input',value:email,onChange:e=>setEmail(e.target.value),required:true})),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:4}},
+          React.createElement('label',{style:{fontSize:'0.875rem',fontWeight:500}},'Senha'),
+          React.createElement('input',{type:'password',className:'input',value:pass,onChange:e=>setPass(e.target.value),required:true})),
+        React.createElement('button',{type:'submit',className:'btn btn-primary',style:{justifyContent:'center',marginTop:8}},'Entrar'))))
+}
+
+function AdminPanel({onLogout}){
+  const[orgs,setOrgs]=useState([])
+  const[showForm,setShowForm]=useState(false)
+  const[form,setForm]=useState({name:'',slug:'',document:'',adminName:'',adminEmail:'',adminPassword:'123456'})
+  const[stats,setStats]=useState({totalOrgs:0,activeOrgs:0})
+
+  useEffect(()=>{load()},[])
+  const load=()=>{apiFetch('/api/organizations').then(setOrgs).catch(()=>{});apiFetch('/api/stats').then(setStats).catch(()=>{})}
+
+  const handleCreate=async e=>{
+    e.preventDefault()
+    try{
+      await apiFetch('/api/organizations',{method:'POST',body:JSON.stringify(form)})
+      setShowForm(false);setForm({name:'',slug:'',document:'',adminName:'',adminEmail:'',adminPassword:'123456'});load()
+    }catch(e){alert(e.message)}
+  }
+
+  const toggleStatus=async(id,status)=>{
+    const newStatus=status==='active'?'inactive':'active'
+    try{await apiFetch(`/api/organizations/${id}/status?status=${newStatus}`,{method:'PATCH'});load()}
+    catch(e){alert(e.message)}
+  }
+
+  const badgeClass=s=>s==='active'?'badge-active':s==='inactive'?'badge-inactive':'badge-suspended'
+
+  return React.createElement('div',{style:{minHeight:'100vh',padding:24}},
+    React.createElement('div',{style:{maxWidth:1200,margin:'0 auto'}},
+      React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}},
+        React.createElement('div',null,
+          React.createElement('h1',{style:{fontSize:'1.5rem'}},'EduCore Admin'),
+          React.createElement('p',{style:{color:'#64748b',fontSize:'0.875rem'}},'Gerencie as escolas cadastradas')),
+        React.createElement('button',{onClick:onLogout,className:'btn btn-outline'},'Sair')),
+
+      // Stats
+      React.createElement('div',{style:{display:'flex',gap:16,marginBottom:24}},
+        React.createElement('div',{className:'card',style:{flex:1}},
+          React.createElement('p',{style:{fontSize:'0.875rem',color:'#64748b'}},'Total Escolas'),
+          React.createElement('p',{style:{fontSize:'1.5rem',fontWeight:700}},stats.totalOrgs)),
+        React.createElement('div',{className:'card',style:{flex:1}},
+          React.createElement('p',{style:{fontSize:'0.875rem',color:'#64748b'}},'Escolas Ativas'),
+          React.createElement('p',{style:{fontSize:'1.5rem',fontWeight:700,color:'#166534'}},stats.activeOrgs))),
+
+      // Create button
+      React.createElement('button',{onClick:()=>setShowForm(!showForm),className:'btn btn-primary',style:{marginBottom:16}},
+        showForm?'Cancelar':'Nova Escola'),
+
+      // Form
+      showForm&&React.createElement('div',{className:'card',style:{marginBottom:16}},
+        React.createElement('h3',{style:{marginBottom:16}},'Nova Escola'),
+        React.createElement('form',{onSubmit:handleCreate,style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}},
+          React.createElement('input',{className:'input',placeholder:'Nome da escola',value:form.name,onChange:e=>setForm({...form,name:e.target.value}),required:true}),
+          React.createElement('input',{className:'input',placeholder:'Slug (identificador)',value:form.slug,onChange:e=>setForm({...form,slug:e.target.value}),required:true}),
+          React.createElement('input',{className:'input',placeholder:'CNPJ',value:form.document,onChange:e=>setForm({...form,document:e.target.value})}),
+          React.createElement('input',{className:'input',placeholder:'Nome admin',value:form.adminName,onChange:e=>setForm({...form,adminName:e.target.value}),required:true}),
+          React.createElement('input',{className:'input',placeholder:'Email admin',type:'email',value:form.adminEmail,onChange:e=>setForm({...form,adminEmail:e.target.value}),required:true}),
+          React.createElement('input',{className:'input',placeholder:'Senha admin',value:form.adminPassword,onChange:e=>setForm({...form,adminPassword:e.target.value}),required:true}),
+          React.createElement('button',{type:'submit',className:'btn btn-primary',style:{gridColumn:'1/-1',justifyContent:'center'}},'Criar Escola + Admin')))),
+
+      // Table
+      React.createElement('div',{className:'card'},
+        React.createElement('table',null,
+          React.createElement('thead',null,React.createElement('tr',null,
+            React.createElement('th',null,'Escola'),
+            React.createElement('th',null,'Slug'),
+            React.createElement('th',null,'CNPJ'),
+            React.createElement('th',null,'Criada em'),
+            React.createElement('th',null,'Status'),
+            React.createElement('th',null,'Ações'))),
+          React.createElement('tbody',null,
+            orgs.map(o=>React.createElement('tr',{key:o.id},
+              React.createElement('td',{style:{fontWeight:500}},o.name),
+              React.createElement('td',{style:{fontFamily:'monospace',fontSize:'0.875rem',color:'#64748b'}},o.slug),
+              React.createElement('td',null,o.document||'-'),
+              React.createElement('td',null,new Date(o.createdAt).toLocaleDateString('pt-BR')),
+              React.createElement('td',null,React.createElement('span',{className:`badge ${badgeClass(o.status)}`},{active:'Ativo',inactive:'Inativo',suspended:'Suspenso'}[o.status]||o.status)),
+              React.createElement('td',null,
+                React.createElement('button',{
+                  onClick:()=>toggleStatus(o.id,o.status),
+                  className:`btn ${o.status==='active'?'btn-danger':'btn-primary'}`,
+                  style:{fontSize:'0.8rem',padding:'4px 12px'}
+                },o.status==='active'?'Desativar':'Ativar')))))))))
+}
+
+function App(){
+  const[logged,setLogged]=useState(!!token)
+  if(!logged)return React.createElement(Login,{onLogin:()=>setLogged(true)})
+  return React.createElement(AdminPanel,{onLogout:()=>{token=null;localStorage.removeItem('token');setLogged(false)}})
+}
+
+createRoot(document.getElementById('root')).render(React.createElement(App))
+</script></body></html>
