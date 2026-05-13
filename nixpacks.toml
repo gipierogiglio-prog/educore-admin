@@ -1,8 +1,6 @@
-[phases.install]
-cmds = ["dotnet restore admin.sln"]
-
-[phases.build]
-cmds = ["dotnet publish admin.sln -c Release -o out"]
+[phases]
+install = "dotnet restore admin.sln"
+build = "dotnet publish admin.sln -c Release -o out"
 
 [start]
 cmd = "dotnet out/AdminApi.dll"
