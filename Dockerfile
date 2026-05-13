@@ -1,16 +1,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
-COPY admin.sln .
-COPY AdminApi.csproj .
-RUN dotnet restore
 COPY . .
-RUN dotnet publish -c Release -o /out
+RUN dotnet restore AdminApi.csproj
+RUN dotnet publish AdminApi.csproj -c Release -o /out
+RUN mkdir -p /out/wwwroot && cp frontend/index.html /out/wwwroot/index.html
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 EXPOSE 5000
 COPY --from=build /out .
-COPY frontend/index.html /app/wwwroot/index.html
 ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENTRYPOINT ["dotnet", "AdminApi.dll"]
