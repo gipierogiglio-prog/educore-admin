@@ -84,7 +84,7 @@ app.MapPost("/api/organizations", async (CreateOrgRequest req, AdminDb db) =>
     return Results.Created($"/api/organizations/{org.Id}", new OrgResponse(org.Id, org.Name, org.Slug, org.Document, org.Status, org.CreatedAt));
 });
 
-app.MapPatch("/api/organizations/{id}/status", async (Guid id, string status, AdminDb db) =>
+app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (Guid id, string status, AdminDb db) =>
 {
     var org = await db.Organizations.FindAsync(id);
     if (org == null) return Results.NotFound();
