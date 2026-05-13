@@ -105,4 +105,4 @@ app.MapGet("/api/stats", async (AdminDb db) =>
     return Results.Ok(new { totalOrgs, activeOrgs });
 });
 
-app.Run("http://0.0.0.0:5000");
+app.Run();
