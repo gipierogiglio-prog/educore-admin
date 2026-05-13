@@ -1,0 +1,3 @@
+FROM alpine:3.19
+RUN echo "Build works!" > /test.txt
+CMD cat /test.txt
