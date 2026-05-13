@@ -12,6 +12,8 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAn
 
 var app = builder.Build();
 app.UseCors();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 // Ensure DB + seed super admin
 using (var scope = app.Services.CreateScope())
