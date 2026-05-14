@@ -74,11 +74,11 @@ function renderLogin() {
     <form id="login-form">
       <div class="form-group">
         <label>Email</label>
-        <input class="input" id="login-email" value="admin@educore.com" required>
+        <input class="input" id="login-email" placeholder="seu@email.com" required>
       </div>
       <div class="form-group">
         <label>Senha</label>
-        <input class="input" id="login-pass" type="password" value="admin123" required>
+        <input class="input" id="login-pass" type="password" placeholder="sua senha" required>
       </div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">Entrar</button>
     </form>
@@ -176,11 +176,12 @@ window.toggleForm = () => {
         <form id="create-form">
           <div class="form-grid">
             <div class="form-group"><label>Nome</label><input class="input" id="f-name" required></div>
-            <div class="form-group"><label>Slug</label><input class="input" id="f-slug" required></div>
+            <div class="form-group"><label>Slug</label><input class="input" id="f-slug" placeholder="ex: minha-escola" required>
+            <small style="color:#64748b;font-size:0.75rem">Identificador único para URL (apenas letras, números e hífens)</small></div>
             <div class="form-group"><label>CNPJ</label><input class="input" id="f-doc"></div>
             <div class="form-group"><label>Nome admin</label><input class="input" id="f-admin-name" required></div>
             <div class="form-group"><label>Email admin</label><input class="input" id="f-admin-email" type="email" required></div>
-            <div class="form-group"><label>Senha admin</label><input class="input" id="f-admin-pass" value="123456" required></div>
+            <div class="form-group"><label>Senha admin</label><input class="input" id="f-admin-pass" placeholder="senha do admin" required></div>
             <button type="submit" class="btn btn-primary full" style="justify-content:center">Criar Escola + Admin</button>
           </div>
         </form>
@@ -213,6 +214,16 @@ window.logout = () => {
   token = null
   localStorage.removeItem('token')
   render()
+}
+
+
+function maskCNPJ(el) {
+  let v = el.value.replace(/\D/g, '').substring(0, 14)
+  if (v.length > 2) v = v.substring(0,2) + '.' + v.substring(2)
+  if (v.length > 6) v = v.substring(0,6) + '.' + v.substring(6)
+  if (v.length > 10) v = v.substring(0,10) + '/' + v.substring(10)
+  if (v.length > 15) v = v.substring(0,15) + '-' + v.substring(15)
+  el.value = v
 }
 
 function ce(tag, attrs) {
