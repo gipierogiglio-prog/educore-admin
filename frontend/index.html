@@ -175,7 +175,7 @@ window.toggleForm = () => {
         <h3 style="margin-bottom:16px">Nova Escola</h3>
         <form id="create-form">
           <div class="form-grid">
-            <div class="form-group"><label>Nome</label><input class="input" id="f-name" required></div>
+            <div class="form-group"><label>Nome</label><input class="input" id="f-name" oninput="document.getElementById('f-slug').value=gerarSlug(this.value)" required></div>
             <div class="form-group"><label>Slug</label><input class="input" id="f-slug" placeholder="ex: minha-escola" required>
             <small style="color:#64748b;font-size:0.75rem">Identificador único para URL (apenas letras, números e hífens)</small></div>
             <div class="form-group"><label>CNPJ</label><input class="input" id="f-doc"></div>
@@ -216,6 +216,15 @@ window.logout = () => {
   render()
 }
 
+
+
+function gerarSlug(texto) {
+  return texto
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
 
 function maskCNPJ(el) {
   let v = el.value.replace(/\D/g, '').substring(0, 14)
