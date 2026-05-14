@@ -10,8 +10,24 @@ var jwtKey = "EduCore-Admin-Secret-Key-2024!@#$%";
 builder.Services.AddDbContext<AdminDb>(opt => opt.UseSqlite("Data Source=admin.db"));
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
+// JWT Authentication
+builder.Services.AddAuthentication().AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+    };
+});
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -30,6 +46,25 @@ using (var scope = app.Services.CreateScope())
         });
         db.SaveChanges();
     }
+}
+
+// Helper to extract claims
+static ClaimsPrincipal? ValidateToken(string? authHeader, string jwtKey)
+{
+    if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ")) return null;
+    var token = authHeader["Bearer ".Length..];
+    try
+    {
+        return new JwtSecurityTokenHandler().ValidateToken(token, new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        }, out _);
+    }
+    catch { return null; }
 }
 
 // === Auth ===
@@ -53,14 +88,23 @@ app.MapPost("/api/auth/login", async (LoginRequest req, AdminDb db) =>
     return Results.Ok(new LoginResponse(token, admin.Name));
 });
 
-// === Organizations ===
-app.MapGet("/api/organizations", async (AdminDb db) =>
-    Results.Ok(await db.Organizations.OrderByDescending(o => o.CreatedAt)
-        .Select(o => new OrgResponse(o.Id, o.Name, o.Slug, o.Document, o.Status, o.CreatedAt))
-        .ToListAsync()));
-
-app.MapPost("/api/organizations", async (CreateOrgRequest req, AdminDb db) =>
+// === Organizations (protegido) ===
+app.MapGet("/api/organizations", async (HttpContext ctx, AdminDb db) =>
 {
+    var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
+    if (user == null) return Results.Unauthorized();
+    if (!user.IsInRole("super_admin")) return Results.Forbid();
+    return Results.Ok(await db.Organizations.OrderByDescending(o => o.CreatedAt)
+        .Select(o => new OrgResponse(o.Id, o.Name, o.Slug, o.Document, o.Status, o.CreatedAt))
+        .ToListAsync());
+});
+
+app.MapPost("/api/organizations", async (HttpContext ctx, CreateOrgRequest req, AdminDb db) =>
+{
+    var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
+    if (user == null) return Results.Unauthorized();
+    if (!user.IsInRole("super_admin")) return Results.Forbid();
+
     var slug = req.Slug.ToLower().Replace(" ", "-");
     if (await db.Organizations.AnyAsync(o => o.Slug == slug))
         return Results.BadRequest(new { message = "Slug já existe" });
@@ -84,8 +128,12 @@ app.MapPost("/api/organizations", async (CreateOrgRequest req, AdminDb db) =>
     return Results.Created($"/api/organizations/{org.Id}", new OrgResponse(org.Id, org.Name, org.Slug, org.Document, org.Status, org.CreatedAt));
 });
 
-app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (Guid id, string status, AdminDb db) =>
+app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (HttpContext ctx, Guid id, string status, AdminDb db) =>
 {
+    var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
+    if (user == null) return Results.Unauthorized();
+    if (!user.IsInRole("super_admin")) return Results.Forbid();
+
     var org = await db.Organizations.FindAsync(id);
     if (org == null) return Results.NotFound();
     org.Status = status;
@@ -93,13 +141,23 @@ app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (Guid 
     return Results.Ok(new { message = "Status atualizado" });
 });
 
-app.MapGet("/api/organizations/{id}/admins", async (Guid id, AdminDb db) =>
-    Results.Ok(await db.AdminUsers.Where(u => u.OrganizationId == id)
-        .Select(u => new AdminUserResponse(u.Id, u.Name, u.Email, u.Active))
-        .ToListAsync()));
-
-app.MapGet("/api/stats", async (AdminDb db) =>
+app.MapGet("/api/organizations/{id}/admins", async (HttpContext ctx, Guid id, AdminDb db) =>
 {
+    var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
+    if (user == null) return Results.Unauthorized();
+    if (!user.IsInRole("super_admin")) return Results.Forbid();
+
+    return Results.Ok(await db.AdminUsers.Where(u => u.OrganizationId == id)
+        .Select(u => new AdminUserResponse(u.Id, u.Name, u.Email, u.Active))
+        .ToListAsync());
+});
+
+app.MapGet("/api/stats", async (HttpContext ctx, AdminDb db) =>
+{
+    var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
+    if (user == null) return Results.Unauthorized();
+    if (!user.IsInRole("super_admin")) return Results.Forbid();
+
     var totalOrgs = await db.Organizations.CountAsync();
     var activeOrgs = await db.Organizations.CountAsync(o => o.Status == "active");
     return Results.Ok(new { totalOrgs, activeOrgs });
