@@ -7,7 +7,8 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = "EduCore-Admin-Secret-Key-2024!@#$%";
 
-builder.Services.AddDbContext<AdminDb>(opt => opt.UseSqlite("Data Source=admin.db"));
+var connStr = Environment.GetEnvironmentVariable("CONNECTION_STRING") ?? "Host=localhost;Database=admin_panel;Username=admin_panel_user;Password=AdminPanel2024";
+builder.Services.AddDbContext<AdminDb>(opt => opt.UseNpgsql(connStr));
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
 // JWT Authentication
