@@ -79,7 +79,7 @@ function AdminPanel({onLogout}){
     catch(e){alert(e.message)}
   }
 
-  const badgeClass=s=>s==='active'?'badge-active':s==='inactive'?'badge-inactive':'badge-suspended'
+  const statusLabels={active:"Ativo",inactive:"Inativo",suspended:"Suspenso"};const badgeClass=s=>s==='active'?'badge-active':s==='inactive'?'badge-inactive':'badge-suspended'
 
   return React.createElement('div',{style:{minHeight:'100vh',padding:24}},
     React.createElement('div',{style:{maxWidth:1200,margin:'0 auto'}},
@@ -130,7 +130,7 @@ function AdminPanel({onLogout}){
               React.createElement('td',{style:{fontFamily:'monospace',fontSize:'0.875rem',color:'#64748b'}},o.slug),
               React.createElement('td',null,o.document||'-'),
               React.createElement('td',null,new Date(o.createdAt).toLocaleDateString('pt-BR')),
-              React.createElement('td',null,React.createElement('span',{className:`badge ${badgeClass(o.status)}`},{active:'Ativo',inactive:'Inativo',suspended:'Suspenso'}[o.status]||o.status)),
+              React.createElement('td',null,React.createElement('span',{className:`badge ${badgeClass(o.status)}`},statusLabels[o.status]||o.status)),
               React.createElement('td',null,
                 React.createElement('button',{
                   onClick:()=>toggleStatus(o.id,o.status),
