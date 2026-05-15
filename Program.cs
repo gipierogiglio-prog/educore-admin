@@ -12,6 +12,7 @@ if (!string.IsNullOrEmpty(connStr))
     builder.Services.AddDbContext<AdminDb>(opt => opt.UseNpgsql(connStr));
 else
     builder.Services.AddDbContext<AdminDb>(opt => opt.UseSqlite("Data Source=admin.db"));
+builder.Services.AddHttpClient();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
 // JWT Authentication
@@ -103,7 +104,7 @@ app.MapGet("/api/organizations", async (HttpContext ctx, AdminDb db) =>
         .ToListAsync());
 });
 
-app.MapPost("/api/organizations", async (HttpContext ctx, CreateOrgRequest req, AdminDb db) =>
+app.MapPost("/api/organizations", async (HttpContext ctx, CreateOrgRequest req, AdminDb db, IHttpClientFactory httpClientFactory) =>
 {
     var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
     if (user == null) return Results.Unauthorized();
@@ -128,6 +129,44 @@ app.MapPost("/api/organizations", async (HttpContext ctx, CreateOrgRequest req, 
     };
     db.AdminUsers.Add(adminUser);
     await db.SaveChangesAsync();
+
+    // Sincronizar com o ERP: criar usuário no banco do ERP
+    try
+    {
+        var erpUrl = Environment.GetEnvironmentVariable("ERP_API_URL") ?? "https://api.devgiglio.uk";
+        var client = httpClientFactory.CreateClient();
+        var registerPayload = new
+        {
+            name = req.AdminName,
+            email = req.AdminEmail,
+            password = req.AdminPassword,
+            role = "org_admin",
+            organizationId = org.Id.ToString()
+        };
+        var jsonContent = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(registerPayload),
+            Encoding.UTF8,
+            "application/json"
+        );
+        var response = await client.PostAsync($"{erpUrl}/api/auth/register", jsonContent);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            // Rollback: remover organização e admin criados
+            db.AdminUsers.Remove(adminUser);
+            db.Organizations.Remove(org);
+            await db.SaveChangesAsync();
+            return Results.BadRequest(new { message = $"ERP rejeitou: {errorBody}" });
+        }
+    }
+    catch (Exception ex)
+    {
+        // Rollback
+        db.AdminUsers.Remove(adminUser);
+        db.Organizations.Remove(org);
+        await db.SaveChangesAsync();
+        return Results.BadRequest(new { message = $"Erro ao conectar no ERP: {ex.Message}" });
+    }
 
     return Results.Created($"/api/organizations/{org.Id}", new OrgResponse(org.Id, org.Name, org.Slug, org.Document, org.Status, org.CreatedAt));
 });
