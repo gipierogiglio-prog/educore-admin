@@ -171,7 +171,7 @@ app.MapPost("/api/organizations", async (HttpContext ctx, CreateOrgRequest req, 
     return Results.Created($"/api/organizations/{org.Id}", new OrgResponse(org.Id, org.Name, org.Slug, org.Document, org.Status, org.CreatedAt));
 });
 
-app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (HttpContext ctx, Guid id, string status, AdminDb db) =>
+app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (HttpContext ctx, Guid id, string status, AdminDb db, IHttpClientFactory httpClientFactory) =>
 {
     var user = ValidateToken(ctx.Request.Headers["Authorization"], jwtKey);
     if (user == null) return Results.Unauthorized();
@@ -181,6 +181,26 @@ app.MapMethods("/api/organizations/{id}/status", new[] { "PATCH" }, async (HttpC
     if (org == null) return Results.NotFound();
     org.Status = status;
     await db.SaveChangesAsync();
+
+    // Sincronizar com ERP: atualizar status e desativar/ativar usuarios da organizacao
+    try
+    {
+        var erpUrl = Environment.GetEnvironmentVariable("ERP_API_URL") ?? "https://api.devgiglio.uk";
+        var client = httpClientFactory.CreateClient();
+        var payload = new { status = status, organizationId = id.ToString() };
+        var jsonContent = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(payload),
+            Encoding.UTF8,
+            "application/json"
+        );
+        await client.PostAsync($"{erpUrl}/api/organization/sync-status", jsonContent);
+    }
+    catch (Exception ex)
+    {
+        // Nao faz rollback aqui - apenas log
+        Console.WriteLine($"Warning: ERP sync failed: {ex.Message}");
+    }
+
     return Results.Ok(new { message = "Status atualizado" });
 });
 
